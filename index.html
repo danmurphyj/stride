@@ -764,10 +764,10 @@ function drawBikeObj(bk,fc,rc){
   cx.save();
   cx.translate(sx,sy);
   cx.rotate(bk.angle);
-  cx.shadowBlur=alive?12:0;
+  cx.scale(0.5,0.5);
+  cx.shadowBlur=alive?18:0;
   cx.shadowColor=fca;
 
-  // Визуально в 2× шире: все X-координаты удвоены, Y — без изменений
   const rwx=-BL,rwy=WR,fwx=BL,fwy=WR;
 
   for(const[wx,wy]of[[rwx,rwy],[fwx,fwy]]){
