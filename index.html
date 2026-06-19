@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>$STONKRIDER</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --gold:  #f0b030;
+      --gold2: #f8d060;
+      --dark:  rgba(6,3,1,.85);
+      --brd:   rgba(240,176,48,.45);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      font-family: 'Nunito', sans-serif;
+      background: #0b0906;
+    }
+
+    /* ── CANVAS ── */
+    #vid-wrap { position: fixed; inset: 0; z-index: 0; }
+    #vid-canvas { width: 100%; height: 100%; display: block; }
+
+    /* ── LOADING ── */
+    #loading {
+      position: fixed; inset: 0; z-index: 200;
+      background: #080604;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1.4rem;
+      transition: opacity .5s ease;
+    }
+    #loading .ld-name {
+      font-family: 'Bangers', cursive; letter-spacing: .12em;
+      font-size: clamp(2.5rem, 7vw, 5rem);
+      color: var(--gold);
+      text-shadow: 3px 4px 0 #000;
+    }
+    #loading .ld-track { width: clamp(160px,36vw,360px); height: 3px; background: rgba(240,176,48,.15); }
+    #loading .ld-fill  { height: 100%; width: 0%; background: var(--gold); transition: width .06s linear; }
+    #loading .ld-txt   { font-size: .9rem; font-weight: 700; color: rgba(240,176,48,.5); letter-spacing: .18em; }
+
+    /* ── GRAIN ── */
+    #grain {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+      background-size: 280px; opacity: .045; mix-blend-mode: overlay;
+    }
+
+    /* ── NAVBAR ── */
+    #topnav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      padding: .6rem 1.4rem;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(5,3,1,.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--brd);
+    }
+    .nav-logo {
+      font-family: 'Bangers', cursive; letter-spacing: .12em;
+      font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+      color: var(--gold); text-decoration: none;
+    }
+    .nav-btns { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+
+    /* ── NAV BUTTON: фильтр ТОЛЬКО на ::before (рамке), не на тексте ── */
+    .nbtn {
+      font-family: 'Nunito', sans-serif; font-weight: 800;
+      font-size: clamp(.7rem, 1.3vw, .84rem);
+      text-decoration: none;
+      display: inline-flex; align-items: center; gap: .28rem;
+      padding: .28rem .88rem;
+      position: relative; white-space: nowrap;
+      transition: transform .12s;
+    }
+    .nbtn::before {
+      content: ''; position: absolute; inset: 0;
+      border: 2px solid currentColor;
+      filter: url(#f-border); /* rough border — только рамка */
+      pointer-events: none;
+    }
+    .nbtn:hover { transform: translate(-1px,-2px) rotate(-1deg); }
+    .nbtn-buy { background: var(--gold); color: #0c0800 !important; box-shadow: 3px 3px 0 #5a3800; }
+    .nbtn-buy::before { border-color: #5a3800; }
+    .nbtn-soc { background: transparent; color: #f0e8d0; }
+    .nbtn-soc:hover { color: var(--gold); }
+
+    /* ══════════════════════════════════════
+       SECTIONS
+       Главный принцип: центр всегда ОТКРЫТ.
+       Заголовок — вверху (под навбаром).
+       Контент   — внизу.
+       Персонаж виден в центре на всех секциях.
+    ══════════════════════════════════════ */
+    .section {
+      position: fixed; inset: 0; z-index: 10;
+      display: grid;
+      grid-template-rows: auto 1fr auto; /* top / free / bottom */
+      align-items: start;
+      padding: 4.8rem 1.5rem 1.2rem;
+      opacity: 0; pointer-events: none;
+    }
+
+    /* верхний заголовок секции — без фона, только тени */
+    .sec-head {
+      text-align: center;
+      padding: .5rem 0 0;
+    }
+    .sec-head .s-title {
+      font-family: 'Bangers', cursive; letter-spacing: .1em;
+      font-size: clamp(2rem, 5.5vw, 3.8rem);
+      color: #fff;
+      /* тёмный контур вместо фона — текст читается на любом фоне */
+      text-shadow:
+        -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+        0 0 12px rgba(0,0,0,.9), 0 0 24px rgba(0,0,0,.7);
+    }
+    .sec-head .s-sub {
+      font-size: clamp(.85rem, 1.7vw, 1.05rem); font-weight: 700;
+      color: #e8dfc8;
+      text-shadow: 0 1px 6px #000, 0 0 12px rgba(0,0,0,.9);
+      margin-top: .25rem;
+    }
+
+    /* нижний контент — тёмная подложка, небольшая высота */
+    .sec-foot {
+      width: 100%; display: flex; justify-content: center;
+    }
+    .sec-inner {
+      max-width: 720px; width: 100%;
+      background: var(--dark);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: clamp(.9rem,2vw,1.4rem) clamp(1rem,3vw,2rem);
+      position: relative;
+    }
+    /* рамка отдельным слоем → не размывает содержимое */
+    .sec-inner::before {
+      content: ''; position: absolute; inset: 0;
+      border: 2px solid var(--brd);
+      filter: url(#f-border);
+      pointer-events: none;
+    }
+
+    /* ── HERO (центр полностью открыт) ── */
+    #sec-hero {
+      grid-template-rows: auto 1fr auto;
+      padding-bottom: 5.5rem;
+    }
+    .hero-top {
+      text-align: center; padding-top: .4rem;
+    }
+    .ticker {
+      font-family: 'Nunito', sans-serif; font-weight: 900;
+      font-size: clamp(.82rem, 1.8vw, 1.1rem);
+      letter-spacing: .3em; color: var(--gold);
+      text-shadow: 0 0 8px rgba(0,0,0,.9), -1px -1px 0 #000, 1px 1px 0 #000;
+    }
+    .h-title {
+      font-family: 'Bangers', cursive; letter-spacing: .08em;
+      font-size: clamp(3.2rem, 10vw, 8rem);
+      line-height: .88; color: #fff;
+      text-shadow:
+        -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000,
+        0 0 20px rgba(0,0,0,.95), 0 4px 16px rgba(0,0,0,.8);
+      animation: wobble 7s ease-in-out infinite;
+    }
+    /* нижняя часть hero */
+    .hero-foot {
+      display: flex; flex-direction: column; align-items: center; gap: .65rem;
+    }
+    .tagline {
+      font-size: clamp(.9rem,1.9vw,1.15rem); font-weight: 700;
+      color: #f0e8d0;
+      text-shadow: 0 1px 6px #000, 0 0 14px rgba(0,0,0,.9);
+      letter-spacing: .08em;
+    }
+
+    /* CA */
+    .ca {
+      position: relative; display: inline-flex; align-items: center; gap: .55rem;
+      padding: .5rem 1.3rem; cursor: pointer; user-select: none;
+      background: rgba(6,3,1,.82);
+      backdrop-filter: blur(8px);
+      transition: background .2s;
+    }
+    .ca::before {
+      content: ''; position: absolute; inset: 0;
+      border: 2px solid rgba(240,176,48,.6);
+      filter: url(#f-border);
+      pointer-events: none; transition: border-color .2s;
+    }
+    .ca:hover { background: rgba(240,176,48,.15); }
+    .ca:hover::before { border-color: var(--gold); }
+    .ca-lbl  { font-weight: 800; font-size: .92rem; color: var(--gold); white-space: nowrap; }
+    .ca-addr { font-size: clamp(.6rem,1.25vw,.85rem); font-weight: 700; color: #fff; letter-spacing: .03em; word-break: break-all; }
+    .ca-ico  { color: var(--gold); font-size: .88rem; flex-shrink: 0; }
+    .toast   {
+      position: absolute; top: -2.8rem; left: 50%; transform: translateX(-50%);
+      background: var(--gold); color: #0c0800; font-weight: 900; font-size: .82rem;
+      padding: .1rem .9rem; white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity .2s;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ── TOKENOMICS — горизонтальная лента внизу ── */
+    .token-strip {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: .65rem; width: 100%;
+    }
+    .tcard {
+      padding: .65rem .8rem; position: relative;
+      display: flex; flex-direction: column; gap: .15rem;
+      background: rgba(240,176,48,.08);
+    }
+    .tcard::before {
+      content: ''; position: absolute; inset: 0;
+      border: 2px solid rgba(240,176,48,.4);
+      filter: url(#f-border); pointer-events: none;
+    }
+    .tc-lbl { font-size: .72rem; font-weight: 800; color: var(--gold); letter-spacing: .12em; text-transform: uppercase; }
+    .tc-val { font-family: 'Bangers', cursive; letter-spacing: .05em; font-size: clamp(.95rem,2vw,1.35rem); color: #fff; }
+
+    /* ── HOW TO BUY ── */
+    .steps { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; width: 100%; }
+    .step {
+      display: flex; align-items: flex-start; gap: .7rem;
+      padding: .6rem .85rem; position: relative;
+      background: rgba(240,176,48,.07);
+    }
+    .step::before {
+      content: ''; position: absolute; inset: 0;
+      border: 2px solid rgba(240,176,48,.32);
+      filter: url(#f-border); pointer-events: none;
+    }
+    .step-num  { font-family: 'Bangers', cursive; font-size: 1.7rem; color: var(--gold); flex-shrink: 0; line-height: 1; }
+    .step-head { font-weight: 800; font-size: .95rem; color: #fff; }
+    .step-desc { font-size: .8rem; font-weight: 600; color: rgba(240,232,208,.65); }
+
+    /* ── COMMUNITY ── */
+    .soc-btns { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: center; }
+    .sbtn {
+      font-family: 'Nunito', sans-serif; font-weight: 800;
+      font-size: clamp(.85rem,1.7vw,1.02rem);
+      text-decoration: none; display: inline-flex; align-items: center; gap: .42rem;
+      padding: .5rem 1.45rem;
+      position: relative; white-space: nowrap;
+      transition: transform .14s, box-shadow .14s;
+    }
+    .sbtn::before {
+      content: ''; position: absolute; inset: 0;
+      border: 2.5px solid currentColor;
+      filter: url(#f-border); pointer-events: none;
+    }
+    .sbtn:hover { transform: translate(-2px,-3px) rotate(-1deg); }
+    .sbtn-buy { background: var(--gold); color: #0c0800 !important; font-size: clamp(.95rem,2vw,1.18rem); padding: .56rem 1.9rem; box-shadow: 5px 5px 0 rgba(0,0,0,.75); }
+    .sbtn-buy::before { border-color: rgba(0,0,0,.5); }
+    .sbtn-buy:hover { box-shadow: 7px 7px 0 rgba(0,0,0,.85); }
+    .sbtn-soc { background: rgba(240,176,48,.1); color: #f0e8d0; box-shadow: 3px 3px 0 rgba(0,0,0,.5); }
+    .sbtn-soc:hover { background: rgba(240,176,48,.2); color: var(--gold); }
+
+    /* ── PROGRESS ── */
+    #prog-track { position: fixed; bottom: 0; left: 0; right: 0; height: 3px; z-index: 20; background: rgba(240,176,48,.1); }
+    #prog-fill  { height: 100%; width: 0%; background: var(--gold); }
+
+    /* ── SCROLL HINT ── */
+    #scroll-hint {
+      position: fixed; bottom: 1.6rem; left: 50%; transform: translateX(-50%);
+      z-index: 30; pointer-events: none;
+      color: var(--gold);
+      font-size: 1rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+      display: flex; flex-direction: column; align-items: center; gap: .2rem;
+      transition: opacity .6s ease;
+      text-shadow: 0 0 10px #000, 0 2px 8px #000, -1px -1px 0 #000, 1px 1px 0 #000;
+      white-space: nowrap;
+    }
+    #scroll-hint .arr { animation: hintB 1.6s ease-in-out infinite; }
+    #scroll-hint.hide { opacity: 0; }
+
+    /* ── CORNERS ── */
+    .corner { position: fixed; z-index: 3; pointer-events: none; opacity: .18; }
+    .corner path { filter: url(#f-border); }
+    .c-tl { top: .7rem; left: .7rem; }
+    .c-tr { top: .7rem; right: .7rem;   transform: scaleX(-1); }
+    .c-bl { bottom: .7rem; left: .7rem;  transform: scaleY(-1); }
+    .c-br { bottom: .7rem; right: .7rem; transform: scale(-1); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes wobble { 0%,100%{transform:rotate(-.7deg)} 40%{transform:rotate(.6deg)} }
+    @keyframes hintB  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .token-strip { grid-template-columns: 1fr 1fr; }
+      .steps       { grid-template-columns: 1fr; }
+      .h-title     { font-size: 3.2rem; }
+      .corner      { display: none; }
+      .nav-btns .nbtn-soc span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- SVG FILTERS — только для рамок, никогда не на тексте -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <filter id="f-border" x="-15%" y="-15%" width="130%" height="130%">
+      <feTurbulence type="turbulence" baseFrequency="0.05 0.07" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- CANVAS -->
+<div id="vid-wrap"><canvas id="vid-canvas"></canvas></div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="ld-name">STONKRIDER</div>
+  <div class="ld-track"><div id="ld-fill" class="ld-fill"></div></div>
+  <div class="ld-txt" id="ld-txt">loading…</div>
+</div>
+
+<!-- GRAIN -->
+<div id="grain"></div>
+
+<!-- CORNERS -->
+<svg class="corner c-tl" width="54" height="54" viewBox="0 0 54 54" fill="none"><path d="M4 50 L4 4 L50 4" stroke="#f0b030" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg class="corner c-tr" width="54" height="54" viewBox="0 0 54 54" fill="none"><path d="M4 50 L4 4 L50 4" stroke="#f0b030" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg class="corner c-bl" width="54" height="54" viewBox="0 0 54 54" fill="none"><path d="M4 50 L4 4 L50 4" stroke="#f0b030" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg class="corner c-br" width="54" height="54" viewBox="0 0 54 54" fill="none"><path d="M4 50 L4 4 L50 4" stroke="#f0b030" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+<!-- PROGRESS + HINT -->
+<div id="prog-track"><div id="prog-fill"></div></div>
+<div id="scroll-hint"><span>scroll to move the site</span><span class="arr"><i class="fa-solid fa-angles-down"></i></span></div>
+
+<!-- ══ NAVBAR ══ -->
+<nav id="topnav">
+  <span class="nav-logo">$STONKRIDER</span>
+  <div class="nav-btns">
+    <a href="#"                        class="nbtn nbtn-buy" target="_blank" rel="noopener"><i class="fa-solid fa-rocket"></i> BUY</a>
+    <a href="https://t.me/"            class="nbtn nbtn-soc" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i> <span>Telegram</span></a>
+    <a href="https://x.com/"           class="nbtn nbtn-soc" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> <span>Twitter</span></a>
+    <a href="https://dexscreener.com/" class="nbtn nbtn-soc" target="_blank" rel="noopener"><i class="fa-solid fa-chart-line"></i> <span>Dex</span></a>
+  </div>
+</nav>
+
+<!-- ══ SEC 1 · HERO  (0%–30%) ══
+     Заголовок вверху, CA внизу, центр открыт -->
+<section id="sec-hero" class="section">
+  <!-- ВЕРХ: тикер + название -->
+  <div class="hero-top">
+    <h1 class="h-title">STONK<br>RIDER</h1>
+  </div>
+  <!-- центральная строка пустая — персонаж виден -->
+  <div></div>
+  <!-- НИЗ: слоган + CA -->
+  <div class="hero-foot">
+    <p class="tagline">ride the chart &nbsp;·&nbsp; touch the sky</p>
+    <div class="ca" id="ca-box" role="button" tabindex="0">
+      <span class="ca-lbl">CA:</span>
+      <span class="ca-addr" id="ca-text">99m4XEdhnGKeQoPRSGPYLCu7uWTmgz1eWSRRHbvGpump</span>
+      <i class="fa-regular fa-copy ca-ico"></i>
+      <div class="toast" id="toast">✓ &nbsp;copied!</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SEC 2 · TOKENOMICS  (30%–60%) ══ -->
+<section id="sec-token" class="section">
+  <div class="sec-head">
+    <div class="s-title">TOKENOMICS</div>
+    <div class="s-sub">fair launch · no team tokens · no presale</div>
+  </div>
+  <div></div>
+  <div class="sec-foot">
+    <div class="sec-inner">
+      <div class="token-strip">
+        <div class="tcard"><span class="tc-lbl">Supply</span><span class="tc-val">1,000,000,000</span></div>
+        <div class="tcard"><span class="tc-lbl">Tax</span><span class="tc-val">0% / 0%</span></div>
+        <div class="tcard"><span class="tc-lbl">Liquidity</span><span class="tc-val">Burned 🔥</span></div>
+        <div class="tcard"><span class="tc-lbl">Mint</span><span class="tc-val">Revoked ✓</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SEC 3 · HOW TO BUY  (58%–85%) ══ -->
+<section id="sec-buy" class="section">
+  <div class="sec-head">
+    <div class="s-title">HOW TO BUY</div>
+  </div>
+  <div></div>
+  <div class="sec-foot">
+    <div class="sec-inner">
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">①</span>
+          <div><div class="step-head">Get a Wallet</div><div class="step-desc">Phantom</div></div>
+        </div>
+        <div class="step">
+          <span class="step-num">②</span>
+          <div><div class="step-head">Get SOL</div><div class="step-desc">Coinbase, Binance, etc.</div></div>
+        </div>
+        <div class="step">
+          <span class="step-num">③</span>
+          <div><div class="step-head">Swap on DEX</div><div class="step-desc">Jupiter</div></div>
+        </div>
+        <div class="step">
+          <span class="step-num">④</span>
+          <div><div class="step-head">Hold &amp; Ride 🚀</div><div class="step-desc">Chart only goes up.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SEC 4 · COMMUNITY  (83%–100%) ══ -->
+<section id="sec-community" class="section">
+  <div class="sec-head">
+    <div class="s-title">JOIN THE RIDE</div>
+    <div class="s-sub">see you on the moon 🌙</div>
+  </div>
+  <div></div>
+  <div class="sec-foot">
+    <div class="sec-inner">
+      <div class="soc-btns">
+        <a href="#"                        class="sbtn sbtn-buy" target="_blank" rel="noopener"><i class="fa-solid fa-rocket"></i> BUY $STONKRIDER</a>
+        <a href="https://t.me/"            class="sbtn sbtn-soc" target="_blank" rel="noopener"><i class="fa-brands fa-telegram"></i> Telegram</a>
+        <a href="https://x.com/"           class="sbtn sbtn-soc" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i> Twitter</a>
+        <a href="https://dexscreener.com/" class="sbtn sbtn-soc" target="_blank" rel="noopener"><i class="fa-solid fa-chart-line"></i> Dexscreener</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const CA = '99m4XEdhnGKeQoPRSGPYLCu7uWTmgz1eWSRRHbvGpump';
+  document.getElementById('ca-text').textContent = CA;
+
+  /* ── CONFIG ── */
+  const CAP_FPS    = 20;
+  const CAP_W      = 640;
+  const CAP_H      = 360;
+  const LOAD_SPEED = 4;
+  const SENSITIVITY= 0.06;
+
+  const SECTIONS = [
+    ['sec-hero',      0,    0.30],
+    ['sec-token',     0.28, 0.60],
+    ['sec-buy',       0.57, 0.85],
+    ['sec-community', 0.83, 1.00],
+  ];
+  const FADE = 0.055;
+
+  /* ── CANVAS ── */
+  const canvas   = document.getElementById('vid-canvas');
+  const ctx      = canvas.getContext('2d');
+  const progFill = document.getElementById('prog-fill');
+  const hint     = document.getElementById('scroll-hint');
+  const loadEl   = document.getElementById('loading');
+  const ldFill   = document.getElementById('ld-fill');
+  const ldTxt    = document.getElementById('ld-txt');
+
+  const frames   = [];
+  let framePos   = 0;
+  let targetPos  = 0;
+  let hintHid    = false;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    if (frames.length) draw(Math.round(framePos));
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function draw(idx) {
+    const bmp = frames[Math.max(0, Math.min(idx, frames.length - 1))];
+    if (!bmp) return;
+    const cw = canvas.width, ch = canvas.height;
+    const sc = Math.max(cw / CAP_W, ch / CAP_H);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(bmp, (cw - CAP_W*sc)/2, (ch - CAP_H*sc)/2, CAP_W*sc, CAP_H*sc);
+    if (frames.length > 1) progFill.style.width = (idx / (frames.length-1) * 100) + '%';
+  }
+
+  function secOp(p, s, e) {
+    if (p < s || p > e) return 0;
+    return Math.min(
+      s <= 0   ? 1 : Math.min(1, (p-s)/FADE),
+      e >= 1   ? 1 : Math.min(1, (e-p)/FADE)
+    );
+  }
+  function updateSections() {
+    const p = frames.length > 1 ? framePos / (frames.length-1) : 0;
+    SECTIONS.forEach(([id,s,e]) => {
+      const op = secOp(p,s,e);
+      const el = document.getElementById(id);
+      el.style.opacity       = op;
+      el.style.pointerEvents = op > 0.15 ? 'auto' : 'none';
+    });
+  }
+
+  function rafLoop() {
+    const d = targetPos - framePos;
+    if (Math.abs(d) > 0.04) { framePos += d * 0.5; draw(Math.round(framePos)); }
+    updateSections();
+    requestAnimationFrame(rafLoop);
+  }
+
+  /* ── CAPTURE ── */
+  async function capture() {
+    const vid = document.createElement('video');
+    vid.muted = true; vid.preload = 'auto'; vid.src = 'bg.mp4';
+    await new Promise((ok,err) => {
+      vid.addEventListener('loadedmetadata', ok, { once:true });
+      vid.addEventListener('error', err, { once:true });
+    });
+    const dur = vid.duration;
+    const cap = document.createElement('canvas');
+    cap.width = CAP_W; cap.height = CAP_H;
+    const capCtx = cap.getContext('2d');
+    const bmPs = [];
+    let lastT = -999, fIdx = 0;
+    const store = () => {
+      if (vid.currentTime - lastT < 1/CAP_FPS) return;
+      lastT = vid.currentTime;
+      const i = fIdx++;
+      capCtx.drawImage(vid, 0, 0, CAP_W, CAP_H);
+      bmPs.push(createImageBitmap(cap).then(bmp => { frames[i] = bmp; }));
+      ldFill.style.width = Math.min(99, Math.round(vid.currentTime/dur*100)) + '%';
+      ldTxt.textContent  = Math.min(99, Math.round(vid.currentTime/dur*100)) + '%';
+    };
+    await new Promise(done => {
+      let fin = false;
+      const finish = () => { if(!fin){fin=true;done();} };
+      if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+        const onF = () => { store(); (!vid.ended && vid.currentTime < dur-0.08) ? vid.requestVideoFrameCallback(onF) : finish(); };
+        vid.requestVideoFrameCallback(onF);
+      } else {
+        vid.addEventListener('timeupdate', store);
+      }
+      vid.addEventListener('ended', finish, { once:true });
+      setTimeout(finish, (dur/LOAD_SPEED)*1000 + 5000);
+      vid.playbackRate = LOAD_SPEED;
+      vid.play().catch(finish);
+    });
+    await Promise.all(bmPs);
+  }
+
+  /* ── SCROLL ── */
+  function onScroll(dy) {
+    if (!frames.length) return;
+    if (!hintHid) { hint.classList.add('hide'); hintHid = true; }
+    targetPos = Math.max(0, Math.min(targetPos + dy * SENSITIVITY, frames.length-1));
+  }
+  window.addEventListener('wheel', e => { e.preventDefault(); onScroll(e.deltaY); }, { passive:false });
+  let lastTY = null;
+  window.addEventListener('touchstart', e => { lastTY = e.touches[0].clientY; }, { passive:true });
+  window.addEventListener('touchmove',  e => {
+    e.preventDefault();
+    if (lastTY == null) return;
+    onScroll(lastTY - e.touches[0].clientY);
+    lastTY = e.touches[0].clientY;
+  }, { passive:false });
+  window.addEventListener('touchend', () => { lastTY = null; });
+
+  /* ── START ── */
+  capture().then(() => {
+    draw(0); updateSections();
+    ldFill.style.width = '100%'; ldTxt.textContent = '100%';
+    setTimeout(() => {
+      loadEl.style.opacity = '0'; loadEl.style.pointerEvents = 'none';
+      setTimeout(() => loadEl.remove(), 600);
+    }, 200);
+    requestAnimationFrame(rafLoop);
+  }).catch(() => loadEl.remove());
+
+  /* ── COPY CA ── */
+  const caBox = document.getElementById('ca-box');
+  const toast = document.getElementById('toast');
+  function copyCA() {
+    const show = () => { toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1800); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(CA).then(show).catch(fb);
+    } else fb();
+    function fb() {
+      const t = Object.assign(document.createElement('textarea'),{value:CA,style:'position:fixed;opacity:0'});
+      document.body.appendChild(t); t.focus(); t.select();
+      try{document.execCommand('copy');}catch(_){}
+      document.body.removeChild(t); show();
+    }
+  }
+  caBox.addEventListener('click', copyCA);
+  caBox.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){e.preventDefault();copyCA();} });
+</script>
+</body>
+</html>
